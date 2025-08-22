@@ -13,17 +13,13 @@ func main() {
 
 	apiInstance := &handlers.API{DB: db}
 
-	http.HandleFunc("/contas", func(w http.ResponseWriter, r *http.Request) {
-		println("Rota /contas acessada com método:", r.Method)
-		switch r.Method {
-		case http.MethodGet:
-			apiInstance.ListarContas(w, r)
-		case http.MethodPost:
-			apiInstance.CriarConta(w, r)
-		default:
-			http.Error(w, "Método não permitido. Use GET para listar ou POST para criar", http.StatusMethodNotAllowed)
+	http.HandleFunc("/contas/importar-sale", func(w http.ResponseWriter, r *http.Request) {
+		println("Rota /contas/importar-sale acessada com método:", r.Method)
+		if r.Method != http.MethodPost {
+			http.Error(w, "Método não permitido. Use POST para importar contas do Sale", http.StatusMethodNotAllowed)
 			return
 		}
+		apiInstance.ImportarContasSale(w, r)
 	})
 
 	porta := ":8081"
@@ -34,4 +30,4 @@ func main() {
 }
 
 // lsof -i :8081
-// kill -9 <18344>
+// kill -9 30368

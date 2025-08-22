@@ -9,6 +9,7 @@ import (
 	"minha-api-go/models"
 )
 
+// API estrutura que contém a conexão com o banco de dados
 type API struct {
 	DB *sql.DB
 }
@@ -30,74 +31,104 @@ func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	json.NewEncoder(w).Encode(payload)
 }
 
-func (api *API) ListarContas(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondError(w, http.StatusMethodNotAllowed, "Método não permitido")
+// ImportarContasSale importa contas do Sale para o banco de dados
+func (api *API) ImportarContasSale(w http.ResponseWriter, r *http.Request) {
+	// Configurar headers CORS
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Content-Type", "application/json")
+
+	// Log da requisição
+	fmt.Printf("Método da requisição: %s\n", r.Method)
+	fmt.Printf("Headers da requisição: %v\n", r.Header)
+
+	// Tratar requisição OPTIONS (preflight)
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	rows, err := api.DB.Query("SELECT Id, Name, Phone, Website, Industry FROM Accounts")
+	// Verificar método
+	if r.Method != "POST" {
+		respondError(w, http.StatusMethodNotAllowed, "Método não permitido. Use POST")
+		return
+	}
+
+	// Verificar Content-Type
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		respondError(w, http.StatusBadRequest, "Content-Type deve ser application/json")
+		return
+	}
+
+	// Estrutura para receber múltiplas contas
+	var contasSale []models.Conta
+	if err := json.NewDecoder(r.Body).Decode(&contasSale); err != nil {
+		respondError(w, http.StatusBadRequest, "Erro ao processar JSON das contas do Sale")
+		return
+	}
+
+	if len(contasSale) == 0 {
+		respondError(w, http.StatusBadRequest, "Nenhuma conta para importar")
+		return
+	}
+
+	// Iniciar uma transação para garantir a consistência dos dados
+	tx, err := api.DB.Begin()
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Erro ao buscar contas")
+		respondError(w, http.StatusInternalServerError, "Erro ao iniciar transação")
 		return
 	}
-	defer rows.Close()
 
-	var contas []models.Conta
-	for rows.Next() {
-		var conta models.Conta
-		err := rows.Scan(&conta.ID, &conta.Name, &conta.Phone, &conta.Website, &conta.Industry)
-		if err != nil {
-			fmt.Printf("Erro ao ler conta do banco: %v\n", err)
+	// Preparar a query de inserção
+	insertSQL := `INSERT INTO Accounts (Name, Phone, Website, Industry) VALUES (?, ?, ?, ?)`
+	stmt, err := tx.Prepare(insertSQL)
+	if err != nil {
+		tx.Rollback()
+		respondError(w, http.StatusInternalServerError, "Erro ao preparar inserção")
+		return
+	}
+	defer stmt.Close()
+
+	contasImportadas := 0
+	var erros []string
+
+	// Processar cada conta
+	for i, conta := range contasSale {
+		if conta.Name == "" {
+			erros = append(erros, fmt.Sprintf("Conta %d: Nome é obrigatório", i+1))
 			continue
 		}
-		contas = append(contas, conta)
+
+		_, err := stmt.Exec(conta.Name, conta.Phone, conta.Website, conta.Industry)
+		if err != nil {
+			erros = append(erros, fmt.Sprintf("Erro ao importar conta %d: %v", i+1, err))
+			continue
+		}
+		contasImportadas++
 	}
 
-	// Verifica se houve algum erro durante a iteração
-	if err = rows.Err(); err != nil {
-		fmt.Printf("Erro ao iterar sobre as contas: %v\n", err)
-		respondError(w, http.StatusInternalServerError, "Erro ao listar contas")
+	// Se houver erros, fazer rollback e retornar os erros
+	if len(erros) > 0 {
+		tx.Rollback()
+		respondJSON(w, http.StatusBadRequest, models.Resposta{
+			Status:   "erro",
+			Mensagem: fmt.Sprintf("Erros na importação: %v", erros),
+		})
 		return
 	}
 
-	fmt.Printf("Total de contas encontradas: %d\n", len(contas))
-	respondJSON(w, http.StatusOK, contas)
-}
-
-func (api *API) CriarConta(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondError(w, http.StatusMethodNotAllowed, "Método não permitido. Use POST para criar conta")
+	// Commit da transação
+	if err := tx.Commit(); err != nil {
+		tx.Rollback()
+		respondError(w, http.StatusInternalServerError, "Erro ao finalizar importação")
 		return
 	}
 
-	var conta models.Conta
-	if err := json.NewDecoder(r.Body).Decode(&conta); err != nil {
-		respondError(w, http.StatusBadRequest, "Erro ao processar JSON")
-		return
-	}
-
-	if conta.Name == "" {
-		respondError(w, http.StatusBadRequest, "Name é obrigatório")
-		return
-	}
-
-	insertSQL := `INSERT INTO Accounts (Name, Phone, Website, Industry) VALUES (?, ?, ?, ?)`
-	result, err := api.DB.Exec(insertSQL, conta.Name, conta.Phone, conta.Website, conta.Industry)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Erro interno ao criar conta")
-		return
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Erro interno ao obter ID da conta criada")
-		return
-	}
-	conta.ID = int(id)
-
+	// Resposta de sucesso
 	respondJSON(w, http.StatusCreated, models.Resposta{
 		Status:   "sucesso",
-		Mensagem: fmt.Sprintf("Conta criada com sucesso! ID: %d", conta.ID),
+		Mensagem: fmt.Sprintf("Importação concluída com sucesso! %d contas importadas", contasImportadas),
 	})
 }
