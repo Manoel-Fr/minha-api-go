@@ -3,10 +3,10 @@ package models
 // Conta representa a estrutura dos dados de uma conta para o JSON e para o banco de dados
 type Conta struct {
 	ID       int    `json:"id"`
-	Nome     string `json:"nome"`
-	Email    string `json:"email"`
-	Telefone string `json:"telefone"`
-	Cpf      string `json:"cpf"`
+	Name     string `json:"name"`
+	Phone    string `json:"phone"`
+	Website  string `json:"website"`
+	Industry string `json:"industry"`
 }
 
 // Resposta é a estrutura padrão para as respostas da API

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 
 	"minha-api-go/database"
@@ -14,8 +13,25 @@ func main() {
 
 	apiInstance := &handlers.API{DB: db}
 
-	http.HandleFunc("/conta", apiInstance.CriarConta)
+	http.HandleFunc("/contas", func(w http.ResponseWriter, r *http.Request) {
+		println("Rota /contas acessada com método:", r.Method)
+		switch r.Method {
+		case http.MethodGet:
+			apiInstance.ListarContas(w, r)
+		case http.MethodPost:
+			apiInstance.CriarConta(w, r)
+		default:
+			http.Error(w, "Método não permitido. Use GET para listar ou POST para criar", http.StatusMethodNotAllowed)
+			return
+		}
+	})
 
-	log.Println("API rodando em http://localhost:8888")
-	log.Fatal(http.ListenAndServe(":8888", nil))
+	porta := ":8081"
+	println("Servidor iniciado em http://localhost" + porta)
+	if err := http.ListenAndServe(porta, nil); err != nil {
+		panic(err)
+	}
 }
+
+// lsof -i :8081
+// kill -9 <18344>

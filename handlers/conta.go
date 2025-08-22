@@ -3,7 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 
 	"minha-api-go/models"
@@ -13,39 +13,91 @@ type API struct {
 	DB *sql.DB
 }
 
+// Função utilitária para responder erros de forma padronizada
+func respondError(w http.ResponseWriter, status int, mensagem string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(models.Resposta{
+		Status:   "erro",
+		Mensagem: mensagem,
+	})
+}
+
+// Função utilitária para responder sucesso
+func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(payload)
+}
+
+func (api *API) ListarContas(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondError(w, http.StatusMethodNotAllowed, "Método não permitido")
+		return
+	}
+
+	rows, err := api.DB.Query("SELECT Id, Name, Phone, Website, Industry FROM Accounts")
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Erro ao buscar contas")
+		return
+	}
+	defer rows.Close()
+
+	var contas []models.Conta
+	for rows.Next() {
+		var conta models.Conta
+		err := rows.Scan(&conta.ID, &conta.Name, &conta.Phone, &conta.Website, &conta.Industry)
+		if err != nil {
+			fmt.Printf("Erro ao ler conta do banco: %v\n", err)
+			continue
+		}
+		contas = append(contas, conta)
+	}
+
+	// Verifica se houve algum erro durante a iteração
+	if err = rows.Err(); err != nil {
+		fmt.Printf("Erro ao iterar sobre as contas: %v\n", err)
+		respondError(w, http.StatusInternalServerError, "Erro ao listar contas")
+		return
+	}
+
+	fmt.Printf("Total de contas encontradas: %d\n", len(contas))
+	respondJSON(w, http.StatusOK, contas)
+}
+
 func (api *API) CriarConta(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		respondError(w, http.StatusMethodNotAllowed, "Método não permitido. Use POST para criar conta")
 		return
 	}
 
 	var conta models.Conta
-	err := json.NewDecoder(r.Body).Decode(&conta)
+	if err := json.NewDecoder(r.Body).Decode(&conta); err != nil {
+		respondError(w, http.StatusBadRequest, "Erro ao processar JSON")
+		return
+	}
+
+	if conta.Name == "" {
+		respondError(w, http.StatusBadRequest, "Name é obrigatório")
+		return
+	}
+
+	insertSQL := `INSERT INTO Accounts (Name, Phone, Website, Industry) VALUES (?, ?, ?, ?)`
+	result, err := api.DB.Exec(insertSQL, conta.Name, conta.Phone, conta.Website, conta.Industry)
 	if err != nil {
-		log.Printf("Erro ao decodificar JSON: %v", err)
-		http.Error(w, "Erro ao processar JSON", http.StatusBadRequest)
+		respondError(w, http.StatusInternalServerError, "Erro interno ao criar conta")
 		return
 	}
 
-	if conta.Nome == "" || conta.Email == "" {
-		http.Error(w, "Nome e Email são obrigatórios", http.StatusBadRequest)
-		return
-	}
-
-	insertSQL := `INSERT INTO contas (nome, email, telefone, cpf) VALUES ($1, $2, $3, $4) RETURNING id;`
-	err = api.DB.QueryRow(insertSQL, conta.Nome, conta.Email, conta.Telefone, conta.Cpf).Scan(&conta.ID)
+	id, err := result.LastInsertId()
 	if err != nil {
-		log.Printf("Erro ao inserir conta no banco de dados: %v", err)
-		http.Error(w, "Erro interno ao criar conta", http.StatusInternalServerError)
+		respondError(w, http.StatusInternalServerError, "Erro interno ao obter ID da conta criada")
 		return
 	}
+	conta.ID = int(id)
 
-	log.Printf("Conta criada e salva no DB: ID=%d, Nome=%s, Email=%s", conta.ID, conta.Nome, conta.Email)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(models.Resposta{
+	respondJSON(w, http.StatusCreated, models.Resposta{
 		Status:   "sucesso",
-		Mensagem: "Conta criada com sucesso! ID: " + string(rune(conta.ID)),
+		Mensagem: fmt.Sprintf("Conta criada com sucesso! ID: %d", conta.ID),
 	})
 }
