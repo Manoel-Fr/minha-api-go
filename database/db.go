@@ -4,15 +4,19 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
 
 func Conectar() (*sql.DB, error) {
 	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		return nil, fmt.Errorf("variável de ambiente DATABASE_URL não está definida")
+	}
 
 	// Garante que SSL seja usado
-	if connStr[len(connStr)-1] != '?' {
+	if !strings.HasSuffix(connStr, "?") {
 		connStr += "?sslmode=require"
 	}
 
