@@ -10,7 +10,10 @@ import (
 )
 
 func main() {
-	db := database.Conectar()
+	db, err := database.Conectar()
+	if err != nil {
+		log.Fatalf("Erro ao conectar ao banco de dados: %v", err)
+	}
 	defer db.Close()
 
 	apiInstance := &handlers.API{DB: db}
