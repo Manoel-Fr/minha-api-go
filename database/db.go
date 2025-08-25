@@ -10,9 +10,6 @@ import (
 
 func Conectar() (*sql.DB, error) {
 	connStr := os.Getenv("DATABASE_URL")
-	if connStr == "" {
-		return nil, fmt.Errorf("DATABASE_URL não está configurada")
-	}
 
 	// Garante que SSL seja usado
 	if connStr[len(connStr)-1] != '?' {
