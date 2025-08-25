@@ -1,7 +1,9 @@
 package main
 
 import (
+	"log"
 	"net/http"
+	"os"
 
 	"minha-api-go/database"
 	"minha-api-go/handlers"
@@ -22,12 +24,22 @@ func main() {
 		apiInstance.ImportarContasSale(w, r)
 	})
 
-	porta := ":8081"
-	println("Servidor iniciado em http://localhost" + porta)
-	if err := http.ListenAndServe(porta, nil); err != nil {
+	// rota de saúde (útil para Render)
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+
+	// pega porta do ambiente do Render
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081" // fallback local
+	}
+
+	log.Println("Servidor iniciado na porta " + port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		panic(err)
 	}
 }
 
 // lsof -i :8081
-// kill -9 30368
+// kill -9 87388

@@ -82,7 +82,7 @@ func (api *API) ImportarContasSale(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Preparar a query de inserção
-	insertSQL := `INSERT INTO Accounts (Name, Phone, Website, Industry) VALUES (?, ?, ?, ?)`
+	insertSQL := `INSERT INTO Accounts (Name, Phone, Website, Industry) VALUES ($1, $2, $3, $4)`
 	stmt, err := tx.Prepare(insertSQL)
 	if err != nil {
 		tx.Rollback()

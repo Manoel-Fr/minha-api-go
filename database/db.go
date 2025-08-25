@@ -5,35 +5,35 @@ import (
 	"fmt"
 	"log"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 )
 
 const (
 	dbHost = "localhost"
-	dbPort = 3306 // Porta padrão do MySQL
-	dbUser = "root"
+	dbPort = 5432 // Porta padrão do postgres
+	dbUser = "salesuser"
 	dbPass = "2202data"
-	dbName = "SalesforceTest"
+	dbName = "salesdb"
 )
 
 func Conectar() *sql.DB {
-	connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
-		dbUser, dbPass, dbHost, dbPort, dbName)
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		dbHost, dbPort, dbUser, dbPass, dbName)
 
-	db, err := sql.Open("mysql", connStr)
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("Erro ao configurar a conexão com o banco de dados: %v", err)
 	}
 
 	err = db.Ping()
 	if err != nil {
-		log.Fatalf("ERRO: Não foi possível conectar ao banco de dados. Verifique MySQL (rodando?), Firewall, Host/Porta, Usuário/Senha. Detalhes: %v", err)
+		log.Fatalf("ERRO: Não foi possível conectar ao banco de dados. Verifique PostgreSQL (rodando?), Firewall, Host/Porta, Usuário/Senha. Detalhes: %v", err)
 	}
 	fmt.Println("Conexão com o banco de dados estabelecida com sucesso!")
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS Accounts (
-			 Id INT PRIMARY KEY AUTO_INCREMENT,
+			Id SERIAL PRIMARY KEY,
 			Name VARCHAR(255) NOT NULL,
 			Phone VARCHAR(20),
 			Website VARCHAR(255),
