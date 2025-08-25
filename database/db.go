@@ -28,19 +28,5 @@ func Conectar() (*sql.DB, error) {
 		return nil, fmt.Errorf("erro ao testar conexão com o banco: %v", err)
 	}
 
-	// Cria tabela se não existir
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS Accounts (
-			Id SERIAL PRIMARY KEY,
-			Name VARCHAR(255) NOT NULL,
-			Phone VARCHAR(20),
-			Website VARCHAR(255),
-			Industry VARCHAR(100)
-		);
-	`)
-	if err != nil {
-		return nil, err
-	}
-
 	return db, nil
 }
