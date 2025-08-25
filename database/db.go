@@ -4,16 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 
 	_ "github.com/lib/pq"
 )
 
-const (
-	dbHost = "localhost"
-	dbPort = 5432 // Porta padrão do postgres
-	dbUser = "salesuser"
-	dbPass = "2202data"
-	dbName = "salesdb"
+var (
+	dbHost = getEnvOrDefault("DB_HOST", "localhost")
+	dbPort = getEnvIntOrDefault("DB_PORT", 5432)
+	dbUser = getEnvOrDefault("DB_USER", "salesuser")
+	dbPass = getEnvOrDefault("DB_PASS", "2202data")
+	dbName = getEnvOrDefault("DB_NAME", "salesdb")
 )
 
 func Conectar() *sql.DB {
@@ -47,4 +49,20 @@ func Conectar() *sql.DB {
 	fmt.Println("Consulta executada com sucesso.")
 
 	return db
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvIntOrDefault(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
 }
