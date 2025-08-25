@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 
 	_ "github.com/lib/pq"
@@ -10,7 +11,12 @@ import (
 func Conectar() (*sql.DB, error) {
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
-		return nil, sql.ErrConnDone // se não tiver variável, retorna erro simples
+		return nil, fmt.Errorf("DATABASE_URL não está configurada")
+	}
+
+	// Garante que SSL seja usado
+	if connStr[len(connStr)-1] != '?' {
+		connStr += "?sslmode=require"
 	}
 
 	db, err := sql.Open("postgres", connStr)
@@ -19,7 +25,7 @@ func Conectar() (*sql.DB, error) {
 	}
 
 	if err := db.Ping(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("erro ao testar conexão com o banco: %v", err)
 	}
 
 	// Cria tabela se não existir
